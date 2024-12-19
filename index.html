@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2-Player Chess Game</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #2c3e50;
+      font-family: Arial, sans-serif;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    #controls {
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    button {
+      padding: 10px 5vw;
+      font-size: 1rem;
+      font-weight: bold;
+      background-color: #34495e;
+      color: #ecf0f1;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #e74c3c;
+    }
+
+    #chessboard {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      width: 90vw;
+      max-width: 600px;
+      aspect-ratio: 1 / 1;
+      border: 4px solid #34495e;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+      background-color: #ecf0f1;
+    }
+
+    .square {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .light {
+      background-color: #f0d9b5;
+    }
+
+    .dark {
+      background-color: #b58863;
+    }
+
+    .piece {
+      font-size: 3vw;
+      max-width: 100%;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .piece:hover {
+      transform: scale(1.1);
+    }
+
+    #status {
+      margin-top: 20px;
+      background-color: #ecf0f1;
+      padding: 10px 20px;
+      border-radius: 8px;
+      box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+      font-size: 1rem;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    #status span {
+      color: #e74c3c;
+    }
+
+    footer {
+      color: beige;
+      text-align: center;
+      margin-top: 20px;
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 600px) {
+      button {
+        font-size: 0.9rem;
+        padding: 8px 5vw;
+      }
+
+      .piece {
+        font-size: 4vw;
+      }
+
+      #status {
+        font-size: 0.9rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <button id="startGame">Start Game</button>
+    <button id="pauseGame">Pause Game</button>
+    <button id="restartGame">Restart Game</button>
+    <button id="fullScreenToggle">Full Screen</button>
+    <button id="rotateScreen">Rotate Screen</button>
+  </div>
+  <div id="chessboard"></div>
+  <div id="status" style="display: none;">Current Turn: <span id="currentPlayer">White</span></div>
+  <footer><p>Powered By Louis Daru (Nizhum)</p></footer>
+
+  <script>
+    const pieces = {
+      white: {
+        k: "\u2654",
+        q: "\u2655",
+        r: "\u2656",
+        b: "\u2657",
+        n: "\u2658",
+        p: "\u2659",
+      },
+      black: {
+        k: "\u265A",
+        q: "\u265B",
+        r: "\u265C",
+        b: "\u265D",
+        n: "\u265E",
+        p: "\u265F",
+      },
+    };
+
+    let board = [
+      ["br", "bn", "bb", "bq", "bk", "bb", "bn", "br"],
+      ["bp", "bp", "bp", "bp", "bp", "bp", "bp", "bp"],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["wp", "wp", "wp", "wp", "wp", "wp", "wp", "wp"],
+      ["wr", "wn", "wb", "wq", "wk", "wb", "wn", "wr"],
+    ];
+
+    const chessboard = document.getElementById("chessboard");
+    const currentPlayerDisplay = document.getElementById("currentPlayer");
+    const statusDisplay = document.getElementById("status");
+    const startButton = document.getElementById("startGame");
+    const pauseButton = document.getElementById("pauseGame");
+    const restartButton = document.getElementById("restartGame");
+    const fullScreenButton = document.getElementById("fullScreenToggle");
+    const rotateScreenButton = document.getElementById("rotateScreen");
+
+    let selectedSquare = null;
+    let currentPlayer = "white";
+    let gameActive = false;
+
+    function createBoard() {
+      chessboard.innerHTML = "";
+      board.forEach((row, rowIndex) => {
+        row.forEach((cell, colIndex) => {
+          const square = document.createElement("div");
+          square.className = "square " + ((rowIndex + colIndex) % 2 === 0 ? "light" : "dark");
+          square.dataset.row = rowIndex;
+          square.dataset.col = colIndex;
+
+          if (cell) {
+            const pieceColor = cell[0] === "w" ? "white" : "black";
+            const pieceType = cell[1];
+            const piece = document.createElement("div");
+            piece.className = "piece";
+            piece.textContent = pieces[pieceColor][pieceType];
+            piece.dataset.color = pieceColor;
+            piece.dataset.type = pieceType;
+            square.appendChild(piece);
+          }
+
+          square.addEventListener("click", () => onSquareClick(square));
+          chessboard.appendChild(square);
+        });
+      });
+    }
+
+    function onSquareClick(square) {
+      if (!gameActive) return;
+
+      const row = parseInt(square.dataset.row);
+      const col = parseInt(square.dataset.col);
+
+      if (selectedSquare) {
+        const fromRow = parseInt(selectedSquare.dataset.row);
+        const fromCol = parseInt(selectedSquare.dataset.col);
+
+        const piece = board[fromRow][fromCol];
+        const targetPiece = board[row][col];
+
+        if (piece && piece[0] === currentPlayer[0] && (!targetPiece || targetPiece[0] !== currentPlayer[0])) {
+          board[row][col] = piece;
+          board[fromRow][fromCol] = "";
+          currentPlayer = currentPlayer === "white" ? "black" : "white";
+          currentPlayerDisplay.textContent = currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1);
+          selectedSquare = null;
+          createBoard();
+        } else {
+          selectedSquare = null;
+        }
+      } else if (square.firstChild && square.firstChild.dataset.color === currentPlayer) {
+        selectedSquare = square;
+      }
+    }
+
+    startButton.addEventListener("click", () => {
+      gameActive = true;
+      statusDisplay.style.display = "block";
+    });
+
+    pauseButton.addEventListener("click", () => {
+      gameActive = false;
+    });
+
+    restartButton.addEventListener("click", () => {
+      board = [
+        ["br", "bn", "bb", "bq", "bk", "bb", "bn", "br"],
+        ["bp", "bp", "bp", "bp", "bp", "bp", "bp", "bp"],
+        ["", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", ""],
+        ["wp", "wp", "wp", "wp", "wp", "wp", "wp", "wp"],
+        ["wr", "wn", "wb", "wq", "wk", "wb", "wn", "wr"],
+      ];
+      currentPlayer = "white";
+      currentPlayerDisplay.textContent = "White";
+      gameActive = true;
+      createBoard();
+    });
+
+    fullScreenButton.addEventListener("click", () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          alert(`Error trying to enable fullscreen mode: ${err.message}`);
+        });
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    rotateScreenButton.addEventListener("click", () => {
+      if (screen.orientation) {
+        const newOrientation =
+          screen.orientation.type.includes("portrait") ? "landscape-primary" : "portrait-primary";
+        screen.orientation.lock(newOrientation).catch((err) => {
+          alert(`Error locking screen orientation: ${err.message}`);
+        });
+      } else {
+        alert("Screen orientation API is not supported in your browser.");
+      }
+    });
+
+    createBoard();
+  </script>
+</body>
+</html>
